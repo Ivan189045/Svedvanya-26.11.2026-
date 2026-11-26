@@ -1,0 +1,59 @@
+# -*- coding: utf-8 -*-
+"""
+НОЧНАЯ СМЕНА НА РАДИО — КВЕСТ ВЫЖИВАНИЯ
+Ты — ночной сотрудник радио, которому предстоит выжить до утра.
+Следи за показателями, решай задачи и избегай катастроф.
+Запуск: python radio_survival.py
+"""
+
+import random
+import sys
+
+class Game:
+    def __init__(self):
+        self.hour = 0
+        self.minute = 0
+        self.stress = 50  # уровень стресса 0-100
+        self.energy = 100  # уровень энергии 0-100
+        self.concentration = 80  # концентрация 0-100
+        self.listeners = 900
+        self.missions_completed = 0
+        self.logs = []
+        self.over = False
+        self.ending = ""
+
+    def clock(self):
+        return f"{self.hour:02d}:{self.minute:02d}"
+
+    def advance(self, minutes):
+        self.minute += minutes
+        while self.minute >= 60:
+            self.minute -= 60
+            self.hour += 1
+        if self.hour >= 6:
+            self.finish()
+
+    def clamp(self):
+        self.stress = max(0, min(100, self.stress))
+        self.energy = max(0, min(100, self.energy))
+        self.concentration = max(0, min(100, self.concentration))
+        self.listeners = max(0, self.listeners)
+
+    def remember(self, text):
+        self.logs.append(f"[{self.clock()}] {text}")
+
+    def finish(self):
+        self.over = True
+        if self.stress > 80:
+            self.ending = "НЕРВНЫЙ СРЫВ"
+        elif self.energy <= 0:
+            self.ending = "ЭНЕРГИЯ НА НУЛЕ"
+        elif self.concentration <= 0:
+            self.ending = "РАССЕЯННОСТЬ ПОБЕДИЛА"
+        else:
+            if self.missions_completed >= 5:
+                self.ending = "НОЧЬ ГЕРОЯ"
+            elif self.listeners > 1000:
+                self.ending = "УСПЕХ НОЧНОГО ЭФИРА"
+            else:
+                self.ending
