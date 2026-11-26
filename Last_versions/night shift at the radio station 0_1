@@ -1,1 +1,311 @@
+# -*- coding: utf-8 -*-
+"""
+НОЧНАЯ СМЕНА ТЕХНИКА НА РАДИОСТАНЦИИ
+Ты — ночной техник «Радио Горизонт». Твоя задача — держать эфир в эфире.
+Следи за состоянием оборудования, экономь расходники, не дай сигналу пропасть.
+Запуск: python radio_tech_night.py
+"""
+
+import random
+import sys
+
+class Game:
+    def __init__(self):
+        self.hour = 0          # 00:00
+        self.minute = 0
+        self.signal = 100      # качество сигнала 0-100
+        self.equipment_health = 85  # здоровье аппаратуры 0-100
+        self.spare_parts = 3   # запчасти в запасе
+        self.power_reserve = 100  # резерв питания 0-100
+        self.listeners = 900    # слушатели
+        self.logs = []
+        self.over = False
+        self.ending = ""
+
+    def clock(self):
+        return f"{self.hour:02d}:{self.minute:02d}"
+
+    def advance(self, minutes):
+        self.minute += minutes
+        while self.minute >= 60:
+            self.minute -= 60
+            self.hour += 1
+        if self.hour >= 6:
+            self.finish()
+
+    def clamp(self):
+        self.signal = max(0, min(100, self.signal))
+        self.equipment_health = max(0, min(100, self.equipment_health))
+        self.power_reserve = max(0, min(100, self.power_reserve))
+        self.listeners = max(0, self.listeners)
+
+    def remember(self, text):
+        self.logs.append(f"[{self.clock()}] {text}")
+
+    def finish(self):
+        self.over = True
+        if self.signal <= 0 or self.equipment_health <= 0:
+            self.ending = "ЭФИР ПОГАС"
+        elif self.power_reserve <= 0:
+            self.ending = "ОТКЛЮЧЕНИЕ ПО ПИТАНИЮ"
+        else:
+            if self.equipment_health >= 70 and self.signal >= 80:
+                self.ending = "ПРОФЕССИОНАЛ НОЧНОГО ЭФИРА"
+            elif self.equipment_health >= 50:
+                self.ending = "СМЕНА ОТРАБОТАНА"
+            else:
+                self.ending = "НА ГРАНИ СБОЯ"
+
+# ---------- Типы поломок ----------
+
+BREAKDOWNS = [
+    {
+        "name": "Перегрев усилителя",
+        "desc": "Усилитель греется, сигнал начинает «плыть».",
+        "fix_options": [
+            ("Остудить вентилятором", "+signal +eq_health -power"),
+            ("Заменить термопасту", "+eq_health -parts"),
+            ("Снизить мощность", "-signal"),
+        ],
+    },
+    {
+        "name": "Скачок напряжения",
+        "desc": "В щитке щёлкнуло. Резерв питания проседает.",
+        "fix_options": [
+            ("Переключить на резерв", "-power"),
+            ("Проверить автоматы", "+power"),
+            ("Игнорировать", "-equipment_health"),
+        ],
+    },
+    {
+        "name": "Потеря синхронизации",
+        "desc": "Часы на панели сбились, автоматика вещания может отключиться.",
+        "fix_options": [
+            ("Синхронизировать вручную", "+signal"),
+            ("Перезагрузить модуль", "-eq_health"),
+            ("Оставить как есть", "-listeners"),
+        ],
+    },
+    {
+        "name": "Шумы в линии",
+        "desc": "По кабелю идёт наводка. В эфире — треск.",
+        "fix_options": [
+            ("Найти и экранировать кабель", "+signal -parts"),
+            ("Включить фильтр", "-power"),
+            ("Сменить канал передачи", "+signal"),
+        ],
+    },
+]
+
+# ---------- Действия ----------
+
+def check_system(g):
+    print("\n🔧 Ты делаешь обход и проверяешь системы.")
+    status = []
+    if g.signal < 40:
+        status.append("Сигнал слабый — эфир почти не слышен.")
+    if g.equipment_health < 50:
+        status.append("Аппаратура на грани — любой сбой может стать критическим.")
+    if g.power_reserve < 30:
+        status.append("Резерв питания почти на нуле.")
+    if not status:
+        status.append("Системы в норме. Пока.")
+    for s in status:
+        print("  •", s)
+    g.advance(15)
+    g.remember("проверил системы")
+
+def repair_equipment(g):
+    if g.spare_parts <= 0:
+        print("\n🛠 У тебя нет запчастей. В кладовке пусто.")
+        return
+    print("\n🛠 Ты берёшь инструменты и приступаешь к ремонту.")
+    repair_type = random.choice(["усилитель", "кабель", "блок питания", "модуль синхронизации"])
+    print(f"  Ты чинишь: {repair_type}.")
+    g.spare_parts -= 1
+    g.equipment_health += random.randint(8, 15)
+    g.signal += random.randint(5, 10)
+    print(f"  Ремонт завершён. Осталось запчастей: {g.spare_parts}.")
+    g.advance(20)
+    g.remember(f"отремонтировал {repair_type}")
+
+def manage_power(g):
+    print("\n⚡ Ты управляешь распределением питания.")
+    choice = input("Что делаем? (1 — снизить нагрузку, 2 — активировать резерв, 3 — проверить ИБП): ").strip()
+    if choice == "1":
+        g.power_reserve += 10
+        g.signal -= 5
+        print("Нагрузка снижена. Резерв пополняется, но звук чуть тише.")
+    elif choice == "2":
+        if g.power_reserve >= 20:
+            g.power_reserve -= 20
+            g.equipment_health += 10
+            print("Резерв активирован. Оборудование работает стабильнее.")
+        else:
+            print("Недостаточно резерва для активации.")
+    else:
+        g.power_reserve += random.randint(-5, 5)
+        print("ИБП в норме (или нет).")
+    g.advance(10)
+    g.remember("управлял питанием")
+
+def monitor_listeners(g):
+    print("\n📢 Ты смотришь статистику слушателей.")
+    change = random.randint(-150, 200)
+    g.listeners += change
+    print(f"  Слушателей: {max(0, g.listeners)} (изменение: {change:+d})")
+    if change < -100:
+        print("  Эфир теряет аудиторию. Нужно что-то менять.")
+    elif change > 150:
+        print("  Аудитория растёт — видимо, ночной формат заходит.")
+    g.advance(5)
+    g.remember("следил за аудиторией")
+
+def emergency_fix(g):
+    print("\n🚨 ВНЕПЛАНОВЫЙ СБОЙ!")
+    breakdown = random.choice(BREAKDOWNS)
+    print(f"  Проблема: {breakdown['name']}")
+    print(f"  Описание: {breakdown['desc']}")
+    for i, (opt, _) in enumerate(breakdown["fix_options"], 1):
+        print(f"  {i}. {opt}")
+    try:
+        idx = int(input("Твой выбор: ")) - 1
+        if not 0 <= idx < len(breakdown["fix_options"]):
+            raise ValueError
+    except ValueError:
+        idx = 0
+        print("Ты действуешь по привычке — без раздумий.")
+
+    opt, eff = breakdown["fix_options"][idx]
+    effects = {
+        "+signal": (0, 12, 0, 0), "-signal": (0, -12, 0, 0),
+        "+eq_health": (0, 0, 10, 0), "-eq_health": (0, 0, -10, 0),
+        "+power": (0, 0, 0, 8), "-power": (0, 0, 0, -8),
+        "-parts": (0, 0, 0, 0),  # части обрабатываются отдельно
+    }
+    ds, dr, deq, dpow = effects.get(eff, (0, 0, 0, 0))
+    g.signal += dr
+    g.equipment_health += deq
+    g.power_reserve += dpow
+
+    # обработка частей
+    if "-parts" in eff:
+        if g.spare_parts > 0:
+            g.spare_parts -= 1
+        else:
+            print("  Не хватило запчастей — ремонт неполный.")
+            g.equipment_health -= 5
+
+    print("  Сбой устранён (или нет).")
+    g.advance(30)
+    g.remember(f"устранил сбой: {breakdown['name']}")
+
+def routine_maintenance(g):
+    print("\n🧹 Ты проводишь плановое техобслуживание.")
+    g.equipment_health += random.randint(3, 8)
+    g.signal += random.randint(2, 5)
+    print("  Оборудование стало стабильнее. Мелочи имеют значение.")
+    g.advance(25)
+    g.remember("плановое ТО")
+
+def rest_and_coffee(g):
+    print("\n☕ Ты делаешь короткий перерыв и пьёшь кофе.")
+    g.power_reserve += 5
+    g.equipment_health += 3
+    print("  Нервы в порядке, оборудование — тоже.")
+    g.advance(15)
+    g.remember("передохнул и выпил кофе")
+
+# ---------- Главное ----------
+
+MENU = """
+══════════════════════════════════════════
+  ДЕЙСТВИЯ ТЕХНИКА:
+  1 — Проверить системы
+  2 — Отремонтировать оборудование
+  3 — Управлять питанием
+  4 — Следить за аудиторией
+  5 — Устранить аварийный сбой
+  6 — Плановое техобслуживание
+  7 — Передохнуть и выпить кофе
+  0 — Сдать смену (если дожил)
+──────────────────────────────────────────
+"""
+
+def status(g):
+    print(f"\n── {g.clock()} ─ СИГНАЛ: {g.signal} | ТЕХНИКА: {g.equipment_health} | ПИТАНИЕ: {g.power_reserve} | ЗАПЧАСТИ: {g.spare_parts} | СЛУШАТЕЛИ: {g.listeners}")
+
+def intro():
+    print("=" * 46)
+    print("  РАДИО ГОРИЗОНТ — НОЧНАЯ СМЕНА ТЕХНИКА")
+    print("=" * 46)
+    print("00:00. Аппаратная. Панели светятся, индикаторы бегают.")
+    print("Ты — ночной техник. Твоя задача — не дать эфиру замолчать.")
+    print("Держи сигнал, береги аппаратуру, экономь ресурсы.\n")
+
+def main():
+    g = Game()
+    intro()
+    while not g.over:
+        status(g)
+        print(MENU)
+        choice = input("Твой выбор: ").strip()
+        actions = {
+            "1": check_system,
+            "2": repair_equipment,
+            "3": manage_power,
+            "4": monitor_listeners,
+            "5": emergency_fix,
+            "6": routine_maintenance,
+            "7": rest_and_coffee,
+        }
+        if choice == "0":
+            if g.hour >= 5:
+                print("\nТы сдаёшь смену утренней бригаде. Всё работает.")
+                g.ending = "СДАЛ СМЕНУ"
+                g.over = True
+                break
+            else:
+                print("\nСдавать смену рано. Эфир ещё не пережил ночь.")
+                continue
+        act = actions.get(choice)
+        if act:
+            act()
+            g.clamp()
+            if g.signal <= 0 or g.equipment_health <= 0 or g.power_reserve <= 0:
+                g.finish()
+        else:
+            print("Такой кнопки на пульте нет.")
+    print_final(g)
+
+def print_final(g):
+    print("\n" + "=" * 46)
+    print(f"  06:00. СМЕНА ЗАКОНЧЕНА. ФИНАЛ: {g.ending}")
+    print("=" * 46)
+    if g.ending == "ПРОФЕССИОНАЛ НОЧНОГО ЭФИРА":
+        print("Ты не просто удержал эфир — ты сделал его лучше.")
+        print("Утром начальник скажет: «Как ты это делаешь?»")
+    elif g.ending == "СМЕНА ОТРАБОТАНА":
+        print("Смена прошла без катастроф. Это уже победа.")
+        print("Ты выходишь на улицу — город просыпается.")
+    elif g.ending == "НА ГРАНИ СБОЯ":
+        print("Ещё немного — и эфир бы пропал. Но ты удержал.")
+        print("Сегодня ты заслужил отдых.")
+    elif g.ending in ["ЭФИР ПОГАС", "ОТКЛЮЧЕНИЕ ПО ПИТАНИЮ"]:
+        print("Эфир замолчал. Город не услышал твоих новостей.")
+        print("В отчёте напишут: «Сбой по техническим причинам».")
+        print("Но ты знаешь, что это была не просто техника.")
+    elif g.ending == "СДАЛ СМЕНУ":
+        print("Утренняя бригада заходит в аппаратную. Ты киваешь — всё работает.")
+        print("Твоя ночь закончилась. Город проснулся под твой эфир.")
+    print("\nЖурнал смены:")
+    for line in g.logs:
+        print(" ", line)
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (KeyboardInterrupt, EOFError):
+        print("\n\nСвязь прервана. Но аппаратура продолжает работать.")
+        sys.exit(0)
 
